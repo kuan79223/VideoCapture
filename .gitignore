@@ -1,0 +1,28 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+env/
+*.env
+
+# Development and runtime directories
+.idea/
+.vscode/
+*.egg-info/
+dist/
+build/
+
+# Compiled Python files
+*.pyc
+
+# Logs and databases
+*.log
+*.db
+
+# macOS specific files
+.DS_Store
+
+# Editor-specific files
+*~
