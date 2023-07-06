@@ -7,7 +7,8 @@ import cv2
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QImage, QPixmap, QPainter
-from PyQt5.QtWidgets import QGraphicsScene, QVBoxLayout, QGraphicsView, QPushButton, QHBoxLayout, QLineEdit, QFileDialog
+from PyQt5.QtWidgets import QGraphicsScene, QVBoxLayout, QGraphicsView, QPushButton, QHBoxLayout, QLineEdit, \
+    QFileDialog, QGridLayout
 
 WIDTH = 1920
 HEIGHT = 1080
@@ -62,7 +63,7 @@ class CamaraCapture(QtWidgets.QWidget):
         font = self.path_edit.font()
         font.setPointSize(16)
         self.path_edit.setFont(font)
-        self.path_edit.textChanged.connect(self.validate_path)
+        self.path_edit.textEdited.connect(self.validate_path)
 
         path_layout.addWidget(self.path_edit)
         # 選擇儲存路徑的按鈕設定與事件
@@ -71,18 +72,39 @@ class CamaraCapture(QtWidgets.QWidget):
         path_layout.addWidget(select_btn)
         select_btn.clicked.connect(self.select_save_path)
 
-        btn_layout = QHBoxLayout()  # 按鈕布局
-        # 捕捉影像的按鈕事件設定與觸發事件
+        grid_layout = QGridLayout()  # 使用網格布局按鈕
+        # --------- 按鈕設定與觸發事件 -------------
+        btn_binary = QPushButton('二值化')
+        btn_binary.setFixedSize(100, 50)
+        btn_binary.clicked.connect(self.binary_process)
+
+        btn_gaussian_blur = QPushButton('高斯模糊')
+        btn_gaussian_blur.setFixedSize(100, 50)
+        btn_binary.clicked.connect(self.gaussian_blur_process)
+
+        btn_bilate = QPushButton('膨脹')
+        btn_bilate.setFixedSize(100, 50)
+        btn_binary.clicked.connect(self.bilate_process)
+
+        btn_erode = QPushButton('侵蝕')
+        btn_erode.setFixedSize(100, 50)
+        btn_binary.clicked.connect(self.erode_process)
+
         btn_capture = QPushButton('拍照')
         btn_capture.setFixedSize(100, 50)
         btn_capture.clicked.connect(self.capture)
-        btn_layout.addWidget(btn_capture)
 
-        # 離開應用程式的按鈕設定與觸發事件
         btn_leave = QPushButton('關閉應用程式')
         btn_leave.setFixedSize(100, 50)
         btn_leave.clicked.connect(self.leave_sys)
-        btn_layout.addWidget(btn_leave)
+        # --------------------------------------
+        # 按鈕佈進網格內
+        grid_layout.addWidget(btn_binary, 0, 1)
+        grid_layout.addWidget(btn_gaussian_blur, 0, 2)
+        grid_layout.addWidget(btn_bilate, 0, 3)
+        grid_layout.addWidget(btn_erode, 0, 4)
+        grid_layout.addWidget(btn_capture, 1, 1)
+        grid_layout.addWidget(btn_leave, 1, 2)
 
         self.frame = None
         self.save_path = ''
@@ -97,8 +119,20 @@ class CamaraCapture(QtWidgets.QWidget):
         self.thread.start()
 
         layout.addLayout(path_layout)
-        layout.addLayout(btn_layout)
+        layout.addLayout(grid_layout)
         self.setLayout(layout)
+
+    def binary_process(self):
+        pass
+
+    def gaussian_blur_process(self):
+        pass
+
+    def bilate_process(self):
+        pass
+
+    def erode_process(self):
+        pass
 
     def select_save_path(self):
 
@@ -113,8 +147,10 @@ class CamaraCapture(QtWidgets.QWidget):
     def validate_path(self):
         text = self.path_edit.text()
         if text:
+            self.save_path = text
             print('路徑存在')
         else:
+            self.save_path = ''
             print('路徑不存在')
 
     def display(self, frame):
@@ -131,7 +167,8 @@ class CamaraCapture(QtWidgets.QWidget):
         self.graph_view.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)
 
     def capture(self):
-        if self.save_path:
+
+        if os.path.exists(self.save_path):
             # 設定要儲存的影像檔名格式
             date_time = str(datetime.datetime.today())
             print(date_time)
@@ -145,6 +182,7 @@ class CamaraCapture(QtWidgets.QWidget):
 
         else:
             return
+
     def leave_sys(self):
         try:
             self.thread.stop()
