@@ -138,15 +138,16 @@ class CamaraCapture(QMainWindow, camera_ui.Ui_MainWindow):
         self.graph_process.fitInView(scene_processed.sceneRect(), Qt.KeepAspectRatio)
 
     def open_dialog(self):
-        self.open_dialog_thread = threading.Thread(target=self.show_dialog())
+        self.open_dialog_thread = threading.Thread(target=self.show_dialog)
         self.open_dialog_thread.start()
 
     # 選擇儲放影像的路徑
     def show_dialog(self):
-        path = QFileDialog.getExistingDirectory(self, '選擇儲存路徑', 'D:')
-        print(path)
-        if path:
-            self.lineEdit.setText(path)
+
+        self.save_path = QFileDialog.getExistingDirectory(self, '選擇儲存路徑', 'D:')
+        # print(self.save_path)
+        if self.save_path:
+            self.lineEdit.setText(self.save_path)
 
     # 判斷 line edit 是否存在字串內容
     def validate_path(self):
@@ -173,17 +174,14 @@ class CamaraCapture(QMainWindow, camera_ui.Ui_MainWindow):
         if os.path.exists(self.save_path):
             # 設定要儲存的影像檔名格式
             date_time = str(datetime.datetime.today())
-            print(date_time)
+            # print(date_time)
             mDate, mTime = date_time.split(' ')
             mDate = mDate.replace('-', '')
             mTime = mTime.replace(':', '').replace('.', '')[:-2]
-            imgName = mDate + '_' + mTime + '.png'
+            img_name = mDate + '_' + mTime + '.png'
 
-            cv2.imwrite(os.path.join(self.save_path, imgName), self.frame)
-            print('儲存影像: ' + os.path.join(self.save_path, imgName))
-
-        else:
-            return
+            cv2.imwrite(os.path.join(self.save_path, img_name), self.frame)
+            # print('儲存影像: ' + os.path.join(self.save_path, img_name))
 
     # 離開應用程式
     def close_sys(self):
@@ -192,6 +190,7 @@ class CamaraCapture(QMainWindow, camera_ui.Ui_MainWindow):
             self.open_dialog_thread.stop()
         except Exception as exc:
             print(exc)
+
 
 # 設定相機解析度
 def set_pixels(cap):
