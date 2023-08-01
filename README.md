@@ -16,7 +16,7 @@
 
 shell -
 
-    python -m venv venv
+    py -3.9 -m venv venv
 
 
 在 Windows 環境中，啟動虛擬環境：

@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 import sys
 import threading
 import time
@@ -8,7 +9,7 @@ import cv2
 import numpy as np
 from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot, Qt
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QFileDialog, QMainWindow, QGraphicsScene, QApplication
+from PyQt5.QtWidgets import QFileDialog, QMainWindow, QGraphicsScene, QApplication, QMessageBox
 
 import camera_ui
 
@@ -204,10 +205,11 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
 
         self.btn_upload.clicked.connect(self.open_upload_dialog)
 
-        if VIDEO.isOpened() is not True:
-            self.btn_upload.setEnabled(True)
-        else:
-            self.btn_upload.setEnabled(False)
+        # # 當相機開啟時，匯入圖片按鈕無效
+        # if VIDEO.isOpened():
+        #     self.btn_upload.setEnabled(False)
+        # else:
+        #     self.btn_upload.setEnabled(True)
 
         self.SIGNAL_SHOW_DIALOG.connect(self.show_dialog)  # 傳遞開啟對話視窗的連接
 
@@ -227,11 +229,17 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
         # 相機未開啟
         if VIDEO.isOpened() is not True:
 
-            self.image_dir, _ = QFileDialog.getOpenFileName(self, '載入圖像', 'D:', "Image Files (*.jpg *.jpeg *.png)")  # 設置文件擴展名過濾,用雙分號間隔
+            self.image_dir, _ = QFileDialog.getOpenFileName(self, '載入圖像', 'D:',
+                                                            "Image Files (*.jpg *.jpeg *.png)")  # 設置文件擴展名過濾,用雙分號間隔
             # 選擇到影像路徑之後，改變狀態
             if self.image_dir:
-                self.isLoad_img = True
-                self.camera_thread.change_state = True
+                # print(self.image_dir.split("/")[-1].split('.')[0])
+                pattern = '^[\w\-. \[\]]+$'
+                if re.match(pattern, self.image_dir):
+                    self.isLoad_img = True
+                    self.camera_thread.change_state = True
+                else:
+                    QMessageBox.warning(None, "提示", "Filename can't Chinese!")
 
     @pyqtSlot(np.ndarray, int, int)  # 調整影像執行緒的信號槽
     def display_process_video(self, npImg, height, width):
