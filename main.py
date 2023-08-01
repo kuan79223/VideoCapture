@@ -20,12 +20,12 @@ VIDEO = cv2.VideoCapture(COM, cv2.CAP_DSHOW)
 
 
 # 即時顯示影像與處理影像
-class CameraThread(QThread):
+class ProcessThread(QThread):
     SIGNAL_FRAME = pyqtSignal(np.ndarray)  # 傳遞原圖的信號
     SIGNAL_HANDLE_IMAGE = pyqtSignal(np.ndarray, int, int)  # 傳遞處理後的影像信號
 
     def __init__(self, main):
-        super(CameraThread, self).__init__()
+        super(ProcessThread, self).__init__()
         self.main = main
         self.running = True
         self.isDetectCamera = True
@@ -38,6 +38,7 @@ class CameraThread(QThread):
         self.blur_value = 1
         self.binary_frame = None  # 預設二值化變數
         self.image_dir = ''  # 設定一個接收匯入圖片的變數
+        self.change_state = False  # 設定 slider_bar modify 的狀態
 
     def run(self):
         set_pixels(VIDEO)  # 設定像素
@@ -49,6 +50,7 @@ class CameraThread(QThread):
                 ret, frame = VIDEO.read()  # 讀取影像回傳 bool 與 影像，bool 代表相機有讀取到影像
                 if ret:
                     self.frame = frame
+
                     height, width, img_process = self.handle_image()
 
                     self.SIGNAL_HANDLE_IMAGE.emit(img_process, height, width)  # 傳遞處理後的影像信號
@@ -72,45 +74,54 @@ class CameraThread(QThread):
                         self.SIGNAL_FRAME.emit(self.frame)
 
             else:
+                # 讀取圖片
                 while self.running:
                     time.sleep(0.001)
                     # 判斷 讀取影像路徑的變數 和 讀取影像狀態是否成立
                     if self.main.image_dir and self.main.isLoad_img:
                         self.frame = cv2.imread(self.main.image_dir)
                         # 將 讀取到的影像路徑變數放在記憶體中
-                        self.image_dir = self.main.image_dir
+                        # self.image_dir = self.main.image_dir
                         # 因為是按鈕觸發，所以當影像路徑存到變數之後，將狀態改為 False
                         self.main.isLoad_img = False
 
+                    # 判斷讀取的影像是否成立
                     if self.frame is not None:
                         height, width, img_process = self.handle_image()
                         self.SIGNAL_HANDLE_IMAGE.emit(img_process, height, width)  # 傳遞處理後的影像
 
                         # 找輪廓 - 且在原圖上進行繪圖
                         contours, hierarchy = cv2.findContours(img_process, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+                        total_avg = []
                         img_draw = self.frame.copy()
                         for i in range(0, len(contours)):
                             # area = cv2.contourArea(contours[i])  # 取得輪廓面積
                             rx_min, ry_min, rw, rh = cv2.boundingRect(contours[i])
                             rx_max = rx_min + rw
                             ry_max = ry_min + rh
-                            print(rx_min, ry_min, rx_max, ry_max)
+                            # print(rx_min, ry_min, rx_max, ry_max)
 
-                            img_draw = cv2.rectangle(img_draw, (rx_min, ry_min), (rx_max, ry_max), (255, 0, 0), 3)
+                            rect_ = cv2.rectangle(img_draw, (rx_min, ry_min), (rx_max, ry_max), (255, 0, 0), 3)
 
                             crop_img = self.frame[ry_min:ry_max, rx_min:rx_max]
                             text = str(int(crop_img.mean()))  # 計算 RGB 均值
+                            total_avg.append(crop_img.mean())
                             # 在影像上顯示數值
-                            cv2.putText(img_draw, text, (rx_min + int(rw / 2), ry_min + int(rh / 2)), cv2.FONT_HERSHEY_SIMPLEX,
+                            cv2.putText(rect_, text, (rx_min + int(rw / 2), ry_min + int(rh / 2)), cv2.FONT_HERSHEY_SIMPLEX,
                                         1, (0, 0, 255), 2)
 
+                        self.main.lb_avg.setText('輪廓總均值:  '+ str(int(sum(total_avg) / len(contours))))
+                        # 狀態改變時，更新視圖
+                        if self.change_state:
                             if len(contours) != 0:
+
                                 # 左側畫框的影像
                                 self.SIGNAL_FRAME.emit(img_draw)
                             else:
                                 # 左側原圖影像
                                 self.SIGNAL_FRAME.emit(self.frame)
+
+                            self.change_state = False
 
     # 影像處理
     def handle_image(self):
@@ -137,28 +148,32 @@ class CameraThread(QThread):
         if object_name == 'slider_binary':
             self.binary_value = self.sender().value()
             self.main.label_binary.setText(str(self.binary_value))
+            self.change_state = True
 
         elif object_name == 'slider_dilate':
             self.dilate_value = self.sender().value()
             self.main.label_dilate.setText(str(self.dilate_value))
+            self.change_state = True
 
         elif object_name == 'slider_erode':
             self.erode_value = self.sender().value()
             self.main.label_erode.setText(str(self.erode_value))
+            self.change_state = True
 
         elif object_name == 'spinBox_guass':
             self.blur_value = self.sender().value()
+            self.change_state = True
 
     def stop(self):
         self.running = False
         VIDEO.release()
 
 
-class CamaraCapture(QMainWindow, camera_ui.Ui_MainWindow):
+class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
     SIGNAL_SHOW_DIALOG = pyqtSignal()  # 開啟對話方塊的信號
 
     def __init__(self):
-        super(CamaraCapture, self).__init__()
+        super(ImageProcess, self).__init__()
         self.setupUi(self)
 
         self.setFixedSize(1280, 768)  # 設定介面大小
@@ -176,7 +191,7 @@ class CamaraCapture(QMainWindow, camera_ui.Ui_MainWindow):
         self.save_path = ''
 
         # 打開應用程式就啟動執行緒捕捉畫面
-        self.camera_thread = CameraThread(self)
+        self.camera_thread = ProcessThread(self)
         self.camera_thread.SIGNAL_FRAME.connect(self.display_video)
         self.camera_thread.SIGNAL_HANDLE_IMAGE.connect(self.display_process_video)
         self.camera_thread.start()
@@ -188,6 +203,12 @@ class CamaraCapture(QMainWindow, camera_ui.Ui_MainWindow):
         self.spinBox_guass.valueChanged.connect(self.camera_thread.update_process)
 
         self.btn_upload.clicked.connect(self.open_upload_dialog)
+
+        if VIDEO.isOpened() is not True:
+            self.btn_upload.setEnabled(True)
+        else:
+            self.btn_upload.setEnabled(False)
+
         self.SIGNAL_SHOW_DIALOG.connect(self.show_dialog)  # 傳遞開啟對話視窗的連接
 
         self.scene_origin = QGraphicsScene()  # 原始畫面
@@ -203,17 +224,18 @@ class CamaraCapture(QMainWindow, camera_ui.Ui_MainWindow):
 
     # 彈出匯入圖片的對話視窗
     def show_dialog(self):
-        # 相機開啟，匯入按鈕不能動作
+        # 相機未開啟
         if VIDEO.isOpened() is not True:
+
             self.image_dir, _ = QFileDialog.getOpenFileName(self, '載入圖像', 'D:', "Image Files (*.jpg *.jpeg *.png)")  # 設置文件擴展名過濾,用雙分號間隔
             # 選擇到影像路徑之後，改變狀態
             if self.image_dir:
                 self.isLoad_img = True
-        else:
-            self.btn_upload.setEnabled(True)
+                self.camera_thread.change_state = True
 
     @pyqtSlot(np.ndarray, int, int)  # 調整影像執行緒的信號槽
     def display_process_video(self, npImg, height, width):
+
         qimg = get_q_img(img=npImg, w=width, h=height)
         self.scene_adjusting.clear()  # 動態執行影像，清理Scene
         self.scene_adjusting.addPixmap(QPixmap(qimg))
@@ -247,9 +269,11 @@ class CamaraCapture(QMainWindow, camera_ui.Ui_MainWindow):
         self.frame = frame
         height, width = frame.shape[:2]
         qimg = QImage(bytes(frame), width, height, 3 * width, QImage.Format_BGR888)
+        self.scene_origin.clear()  # 動態執行影像，清理Scene
         self.scene_origin.addPixmap(QPixmap(qimg))
         self.graph_origin.setScene(self.scene_origin)
         self.graph_origin.fitInView(self.scene_origin.sceneRect(), Qt.KeepAspectRatio)
+
 
     # 拍照
     def capture(self):
@@ -297,6 +321,6 @@ def get_q_img(img, w, h):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    win = CamaraCapture()
+    win = ImageProcess()
     win.show()
     sys.exit(app.exec())
