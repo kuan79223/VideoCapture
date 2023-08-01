@@ -274,7 +274,6 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
         self.graph_origin.setScene(self.scene_origin)
         self.graph_origin.fitInView(self.scene_origin.sceneRect(), Qt.KeepAspectRatio)
 
-
     # 拍照
     def capture(self):
 
