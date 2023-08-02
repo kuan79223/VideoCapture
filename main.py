@@ -51,7 +51,10 @@ class ProcessThread(QThread):
                 ret, frame = VIDEO.read()  # 讀取影像回傳 bool 與 影像，bool 代表相機有讀取到影像
                 if ret:
                     self.frame = frame
-
+                    if self.frame.all():
+                        self.main.btn_save_path.setEnabled(True)
+                    else:
+                        self.main.btn_save_path.setEnabled(False)
                     height, width, img_process = self.handle_image()
 
                     self.SIGNAL_HANDLE_IMAGE.emit(img_process, height, width)  # 傳遞處理後的影像信號
@@ -88,6 +91,8 @@ class ProcessThread(QThread):
 
                     # 判斷讀取的影像是否成立
                     if self.frame is not None:
+                        self.main.btn_save_path.setEnabled(True)
+
                         height, width, img_process = self.handle_image()
                         self.SIGNAL_HANDLE_IMAGE.emit(img_process, height, width)  # 傳遞處理後的影像
 
@@ -128,7 +133,8 @@ class ProcessThread(QThread):
     def handle_image(self):
         # 影像處理之前會先做二值化
         gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
-        _, self.binary_frame = cv2.threshold(gray, self.binary_value, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        _, self.binary_frame = cv2.threshold(gray, self.binary_value, 255, cv2.THRESH_BINARY)
+        # _, self.binary_frame = cv2.threshold(gray, self.binary_value, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         img_process = cv2.GaussianBlur(self.binary_frame, (self.blur_value, self.blur_value), 10)
 
@@ -182,6 +188,7 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
         self.setWindowFlags(Qt.FramelessWindowHint)
 
         self.btn_capture.clicked.connect(self.capture)
+        self.btn_capture.setEnabled(False)
         self.btn_close_sys.clicked.connect(self.close_sys)
 
         self.lineEdit.textEdited.connect(self.validate_path)
@@ -205,11 +212,12 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
 
         self.btn_upload.clicked.connect(self.open_upload_dialog)
 
-        # # 當相機開啟時，匯入圖片按鈕無效
-        # if VIDEO.isOpened():
-        #     self.btn_upload.setEnabled(False)
-        # else:
-        #     self.btn_upload.setEnabled(True)
+        # 當相機開啟時，匯入圖片按鈕無效
+        if VIDEO.isOpened():
+            self.btn_upload.setEnabled(False)
+
+        else:
+            self.btn_upload.setEnabled(True)
 
         self.SIGNAL_SHOW_DIALOG.connect(self.show_dialog)  # 傳遞開啟對話視窗的連接
 
@@ -233,13 +241,15 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
                                                             "Image Files (*.jpg *.jpeg *.png)")  # 設置文件擴展名過濾,用雙分號間隔
             # 選擇到影像路徑之後，改變狀態
             if self.image_dir:
-                # print(self.image_dir.split("/")[-1].split('.')[0])
-                pattern = '^[\w\-. \[\]]+$'
-                if re.match(pattern, self.image_dir):
+                pattern = re.compile(r'[\u4e00-\u9fa5]')
+                # 路徑內有中文
+                if bool(pattern.search(self.image_dir)):
+                    QMessageBox.warning(None, "提示", "Filename can't Chinese!")
+
+                else:
+                    self.lb_upload_path.setText(self.image_dir)
                     self.isLoad_img = True
                     self.camera_thread.change_state = True
-                else:
-                    QMessageBox.warning(None, "提示", "Filename can't Chinese!")
 
     @pyqtSlot(np.ndarray, int, int)  # 調整影像執行緒的信號槽
     def display_process_video(self, npImg, height, width):
@@ -247,6 +257,8 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
         qimg = get_q_img(img=npImg, w=width, h=height)
         self.scene_adjusting.clear()  # 動態執行影像，清理Scene
         self.scene_adjusting.addPixmap(QPixmap(qimg))
+        # 設定 QGraphicsScene 的大小
+        self.scene_adjusting.setSceneRect(0, 0, QPixmap(qimg).width(), QPixmap(qimg).height())
         self.graph_process.setScene(self.scene_adjusting)
         self.graph_process.fitInView(self.scene_adjusting.sceneRect(), Qt.KeepAspectRatio)
 
@@ -261,8 +273,12 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
 
         self.save_path = QFileDialog.getExistingDirectory(self, '選擇儲存路徑', 'D:')
         # print(self.save_path)
+        # 選擇了路徑拍照按鈕才有功能
         if self.save_path:
+            self.btn_capture.setEnabled(True)
             self.lineEdit.setText(self.save_path)
+        else:
+            self.btn_capture.setEnabled(False)
 
     # 判斷 line edit 是否存在字串內容
     def validate_path(self):
@@ -279,6 +295,9 @@ class ImageProcess(QMainWindow, camera_ui.Ui_MainWindow):
         qimg = QImage(bytes(frame), width, height, 3 * width, QImage.Format_BGR888)
         self.scene_origin.clear()  # 動態執行影像，清理Scene
         self.scene_origin.addPixmap(QPixmap(qimg))
+
+        # 設定 QGraphicsScene 的大小
+        self.scene_origin.setSceneRect(0, 0, QPixmap(qimg).width(), QPixmap(qimg).height())
         self.graph_origin.setScene(self.scene_origin)
         self.graph_origin.fitInView(self.scene_origin.sceneRect(), Qt.KeepAspectRatio)
 
